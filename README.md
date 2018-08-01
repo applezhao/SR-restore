@@ -58,7 +58,7 @@ Requires `tensorflow==1.1.0` and `keras==2.0.2`
     # Train Restore model.
     # Expects images in /path/images/original/ and /path/images/enhanced/
     # Saves model weights, checkpoints, and tensorboard logs to path specified in results.
-    $ python -m sr.train data/images \
+    $ python -m restore.train data/images \
         --results results/ \
         --network cnn \
         --epochs 100 \
@@ -67,7 +67,7 @@ Requires `tensorflow==1.1.0` and `keras==2.0.2`
 
     # Predict original images using trained model weights.
     # (Optional) use `--limit` option to limit num of images to perform on.
-    $ python -m sr.predict data/images/enhanced/ \
+    $ python -m restore.predict data/images/enhanced/ \
         --output results/output/ \
         --weights results/cnn_20170701_190534/weights.h5 \
         --network cnn \
