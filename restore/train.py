@@ -1,38 +1,57 @@
 # -*- coding: utf-8 -*-
+import os
+from models import restore_cnn_model, restore_cnn_bn_model
+from tifffile import imread, imsave
+from datetime import datetime
+import numpy as np
+import keras.backend as K
 
-from .models import restore_cnn_model, restore_cnn_bn_model
-from scipy.misc import imread
+from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau
+from keras.optimizers import Adam
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
 ##
 ## Images
 ##
 
-def getRGBAImgName(index, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/commondata'):
+dataDirectory = r'C:\workspace\imageprocessing\plainColor_env\\'
+resultDiretory = r'C:\workspace\imageprocessing\trainedresult\\'
+
+def getRGBAImgName(index, directory=dataDirectory+'commondata'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, prefix+".rgba.tiff")
 
-def getAlbedoImgName(index, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/commondata'):
+def getAlbedoImgName(index, directory=dataDirectory+'commondata'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, prefix+".albedo.tiff")
 
-def getMatteIDImgName(index, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/commondata'):
+def getMatteIDImgName(index, directory=dataDirectory+'commondata'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, prefix+".matteid.tiff")
 
-def getFGDeepImgName(index, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/fg'):
+def getFGDeepImgName(index, directory=dataDirectory+'fg'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, r'data', prefix+".deep.tiff")
 
 # TODO : if we generate new mask, we need to redefine this function
 # now mask is as 0003.0.mask.tiff 0003.1.mask.tiff
-def getFGMaskImgName(index, subindex, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/fg'):
+def getFGMaskImgName(index, subindex, directory=dataDirectory+'fg'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, r'data', prefix+"."+str(subindex)+".mask.tiff")
 
-def getFGResultImgName(index, directory=r'/disk1/yanli-z/venv_rnn/experiment/data/fg'):
+def getFGResultImgName(index, directory=dataDirectory+'fg'):
     prefix = str(index).zfill(4)
     return os.path.join(directory, r'result', prefix+".tiff")
 
-def list_filenames(indexRange, subindexRange, images_dir=r'/disk1/yanli-z/venv_rnn/experiment/data/fg'):
+def list_filenames(indexRange, subindexRange, images_dir=dataDirectory+'fg'):
     input_rgba_filepaths = []
     input_albedo_filepaths = []
     input_matteid_filepaths = []
@@ -60,7 +79,7 @@ def list_filenames(indexRange, subindexRange, images_dir=r'/disk1/yanli-z/venv_r
     return input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths
 
 def get_filenames():
-    input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths = list_filenames([3,3], [0,1])
+    input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths = list_filenames([3,58], [0,0])
     return input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths
 
 # TODO : change imread to tiffread
@@ -74,18 +93,40 @@ def get_images(filenames):
 def get_image_shape():
     input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths = get_filenames()
     
-    rgbadata = load_image(input_rgba_filepaths[0])
-    albedodata = load_image(input_albedo_filepaths[0])
-    matteiddata = load_image(input_matteid_filepaths[0])
-    deepdata = load_image(input_deep_filepaths[0])
-    maskdata = load_image(input_mask_filepaths[0])
-    resultdata = load_image(output_filepaths[0])
+    print (len(input_mask_filepaths))
+    #print (input_mask_filepaths)
+    
+    trainSet_x = []
+    trainSet_y = []
+    
+    for i in range(0, len(input_mask_filepaths)):
+        print (input_mask_filepaths[i])
+        rgbadata = load_image(input_rgba_filepaths[i])
+        albedodata = load_image(input_albedo_filepaths[i])
+        matteiddata = load_image(input_matteid_filepaths[i])
+        deepdata = load_image(input_deep_filepaths[i])
+        maskdata = load_image(input_mask_filepaths[i])
+        resultdata = load_image(output_filepaths[i])
+    
+        print (rgbadata.shape)
+    
 
-    # TODO : concat all input to x
-    x = rgbadata+albedodata+matteiddata+deepdata+maskdata
-    y = resultdata
-
-    return x.shape, y.shape
+        # TODO : concat all input to x
+        x = np.concatenate((rgbadata,albedodata,matteiddata,deepdata,maskdata), axis=2)
+        y = resultdata
+        
+        
+        
+        trainSet_x.append(x)
+        trainSet_y.append(y)
+    
+    trainSet_x = np.asarray(trainSet_x)
+    trainSet_y = np.asarray(trainSet_y)
+    print ("==============================")
+    print (trainSet_x.shape)
+    print (trainSet_y.shape)
+    print ("===============================")
+    return trainSet_x[0].shape, trainSet_y[0].shape
 
 def get_count():
     input_rgba_filepaths, input_albedo_filepaths, input_matteid_filepaths, input_deep_filepaths, input_mask_filepaths, output_filepaths = get_filenames()
@@ -110,11 +151,15 @@ def image_pair_generator():
             resultdata = load_image(result)
 
             # TODO : concat all input to x
-            x = rgbadata+albedodata+matteiddata+deepdata+maskdata
+            x = np.concatenate((rgbadata,albedodata,matteiddata,deepdata,maskdata), axis=2)
             y = resultdata
 
             x = np.reshape(x, (1,) + x.shape)
             y = np.reshape(y, (1,) + y.shape)
+            
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print (x.shape)
+            print (y.shape)
             yield(x, y)
 
 
@@ -143,7 +188,7 @@ def PSNRLoss(y_true, y_pred):
 class Pipeline():
     def __init__(self, network='espcnn'):
         self.network = network
-        self.results_root_dir = r'/disk1/yanli-z/venv_rnn/experiment/trainedresult'
+        self.results_root_dir = resultDiretory
         self.results_dir = self._get_and_prepare_results_dir()
 
     def _model_name(self):

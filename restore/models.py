@@ -6,7 +6,29 @@ from keras.models import Model
 from keras import backend as K
 
 
-from sr.models import  conv_block, up_block, res_block
+##
+## SR filter blocks
+##
+def conv_block(inputs, filters, kernel_size, strides=(1,1), padding="same", activation='relu'):
+    x = Convolution2D(filters, kernel_size, strides=strides, padding=padding)(inputs)
+    x = BatchNormalization()(x)
+    if activation:
+        x = Activation(activation)(x)
+    return x
+
+def up_block(inputs, filters, kernel_size, strides=(1,1), scale=2, padding="same", activation="relu"):
+    size = (scale,scale)
+    x = UpSampling2D(size)(inputs)
+    x = Convolution2D(filters, kernel_size, strides=strides, padding=padding)(x)
+    x = BatchNormalization()(x)
+    x = Activation(activation)(x)
+    return x
+
+def res_block(inputs, filters=64):
+    x = conv_block(inputs, filters, (3,3))
+    x = conv_block(x, filters, (3,3), activation=False)
+    return merge([x, inputs], mode='sum')
+
 
 ##
 ## RESTORE CNN
@@ -18,7 +40,7 @@ def restore_cnn_model(input_shape):
     # 9-5-5 similar to SRCNN
     x = Convolution2D(64, (9, 9), activation='relu', padding='same', name='level1')(inputs)
     x = Convolution2D(32, (5, 5), activation='relu', padding='same', name='level2')(x)
-    x = Convolution2D(3, (5, 5), activation='relu', padding='same', name='level3')(x)
+    x = Convolution2D(4, (5, 5), activation='relu', padding='same', name='level3')(x)
 
     m = Model(inputs=inputs, outputs=x)
     return m
